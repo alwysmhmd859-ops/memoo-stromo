@@ -1,0 +1,23 @@
+:root{--bg:#14111f;--bg-a:#14111fcc;--surf:#1e1a30;--tx:#efe9ff;--mute:#9d93bd;--ac:#ff7a90;--ac2:#7be0c3}
+[data-theme=nord]{--bg:#2e3440;--bg-a:#2e3440cc;--surf:#3b4252;--tx:#eceff4;--mute:#a3adbf;--ac:#88c0d0;--ac2:#a3be8c}
+[data-theme=dracula]{--bg:#282a36;--bg-a:#282a36cc;--surf:#343746;--tx:#f8f8f2;--mute:#9aa0c0;--ac:#bd93f9;--ac2:#50fa7b}
+[data-theme=forest]{--bg:#10201a;--bg-a:#10201acc;--surf:#18302a;--tx:#e6f2e8;--mute:#8fb09b;--ac:#e9c46a;--ac2:#8ad7a4}
+[data-theme=noir]{--bg:#000;--bg-a:#000c;--surf:#161616;--tx:#f2f2f2;--mute:#8a8a8a;--ac:#fff;--ac2:#bbb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+.app{display:grid;grid-template-columns:180px 1fr;min-height:100vh}
+aside{background:var(--surf);padding:20px 14px;position:sticky;top:0;height:100vh}
+h1{font-size:24px;line-height:1.05;margin:0 0 24px;letter-spacing:-.02em;color:var(--ac)}
+nav{display:flex;flex-direction:column;gap:4px}
+button,select,.search{font:inherit;color:var(--tx);background:var(--surf);border:1px solid #ffffff22;border-radius:8px;padding:8px 12px;cursor:pointer}
+nav button{text-align:left;border:0;background:none}nav .on,.row .on{background:var(--ac);color:var(--bg)}
+button:hover{border-color:var(--ac)}button:focus-visible,input:focus-visible{outline:2px solid var(--ac2);outline-offset:2px}
+main{padding:24px;min-width:0}.search{width:100%;max-width:420px;cursor:text;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px}
+.card{padding:0;border:0;background:none;text-align:left;display:flex;flex-direction:column;gap:6px}
+.card img,.ph{width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:10px;background:var(--surf)}.card span{font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.item{background:var(--surf);padding:8px 12px;border-radius:10px;justify-content:space-between}
+.tags i{font-style:normal;background:var(--ac2);color:var(--bg);border-radius:6px;padding:1px 7px;margin-right:4px;font-size:12px}
+.detail{background-size:cover;background-position:top;padding:16px;border-radius:14px}.player{width:100%;max-height:60vh;background:#000;border-radius:10px;margin:12px 0}
+small,.empty{color:var(--mute)}.err{color:var(--ac)}
+@media(max-width:700px){.app{grid-template-columns:1fr}aside{position:static;height:auto}nav{flex-direction:row;flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
