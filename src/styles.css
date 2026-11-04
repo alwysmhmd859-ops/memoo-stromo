@@ -21,3 +21,4 @@ main{padding:24px;min-width:0}.search{width:100%;max-width:420px;cursor:text;mar
 small,.empty{color:var(--mute)}.err{color:var(--ac)}
 @media(max-width:700px){.app{grid-template-columns:1fr}aside{position:static;height:auto}nav{flex-direction:row;flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.status{color:var(--ac2)}

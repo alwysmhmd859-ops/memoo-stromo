@@ -1,5 +1,5 @@
 export type Meta = { id: string; type: string; name: string; poster?: string; background?: string; description?: string; year?: string; releaseInfo?: string; imdbRating?: string; genres?: string[]; videos?: { id: string; season?: number; episode?: number; title?: string; name?: string }[] };
-export type Stream = { name?: string; title?: string; description?: string; url?: string; infoHash?: string; externalUrl?: string };
+export type Stream = { name?: string; title?: string; description?: string; url?: string; infoHash?: string; fileIdx?: number; sources?: string[]; externalUrl?: string; behaviorHints?: { proxyHeaders?: { request?: Record<string, string> } } };
 export type Addon = { base: string; name: string; resources: string[]; types: string[] };
 
 export const CINEMETA = "https://v3-cinemeta.strem.io";

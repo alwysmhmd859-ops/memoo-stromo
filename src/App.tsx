@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { catalog, loadAddon, meta, streams, type Meta } from "./lib/stremio";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { catalog, loadAddon, meta, streams, type Meta, type Stream } from "./lib/stremio";
+import { getPos, savePos, fmt } from "./lib/progress";
 import { rank, type Ranked } from "./lib/rank";
 import { useStore } from "./lib/store";
 
@@ -76,30 +79,64 @@ function Addons({ st, up }: { st: ReturnType<typeof useStore>[0]; up: ReturnType
   </section>;
 }
 
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const magnetOf = (s: Stream) => {
+  const tr = (s.sources ?? []).filter(x => x.startsWith("tracker:")).map(x => "&tr=" + encodeURIComponent(x.slice(8))).join("");
+  return `magnet:?xt=urn:btih:${s.infoHash}${tr}`;
+};
+
 function Detail({ m, st, up, back }: { m: Meta; st: ReturnType<typeof useStore>[0]; up: ReturnType<typeof useStore>[1]; back: () => void }) {
   const [full, setFull] = useState<Meta>(m);
-  const [raw, setRaw] = useState<ReturnType<typeof Array<any>>>([]);
+  const [raw, setRaw] = useState<any[]>([]);
   const [ep, setEp] = useState<string>(m.id);
-  const [play, setPlay] = useState<string | null>(null);
+  const [web, setWeb] = useState<string | null>(null);
+  const [busy, setBusy] = useState("");
   const saved = st.watchlist.some(x => x.id === m.id);
+  const resume = getPos(ep);
   useEffect(() => { meta(m.type, m.id).then(setFull).catch(() => {}); }, [m]);
   useEffect(() => { setRaw([]); streams(st.addons, m.type, ep, s => setRaw(r => [...r, ...s])); }, [ep, st.addons, m]);
+  useEffect(() => {
+    if (!isTauri) return;
+    let un: (() => void) | undefined;
+    listen<{ pos: number; dur: number }>("mpv-progress", e => savePos(ep, e.payload.pos, e.payload.dur)).then(f => { un = f; });
+    return () => un?.();
+  }, [ep]);
   const ranked: Ranked[] = useMemo(() => rank(raw, st.safety), [raw, st.safety]);
   const eps = (full.videos ?? []).filter(v => v.season);
+
+  async function start(s: Ranked) {
+    try {
+      let url = s.url;
+      if (!url && s.infoHash) {
+        if (!isTauri) throw new Error("Torrent streams need the desktop app.");
+        setBusy("Fetching torrent metadata, this can take a minute…");
+        url = await invoke<string>("torrent_stream", { magnet: magnetOf(s), fileIdx: s.fileIdx ?? null });
+      }
+      if (!url) throw new Error("This source has no playable link.");
+      up({ history: [m, ...st.history.filter(x => x.id !== m.id)].slice(0, 30) });
+      if (isTauri) {
+        const headers = Object.entries(s.behaviorHints?.proxyHeaders?.request ?? {}).map(([k, v]) => `${k}: ${v}`);
+        await invoke("play", { url, title: full.name, start: resume, headers });
+        setBusy("");
+      } else { setWeb(url); setBusy(""); }
+    } catch (e) { setBusy(String(e)); }
+  }
+
   return <article className="detail" style={full.background ? { backgroundImage: `linear-gradient(var(--bg-a),var(--bg)), url(${full.background})` } : undefined}>
     <button onClick={back}>Back</button>
     <h2>{full.name} <small>{full.releaseInfo ?? full.year} {full.imdbRating && `· IMDb ${full.imdbRating}`}</small></h2>
     <p>{full.description}</p>
-    <div className="row"><button onClick={() => up({ watchlist: saved ? st.watchlist.filter(x => x.id !== m.id) : [m, ...st.watchlist] })}>{saved ? "Remove from watchlist" : "Add to watchlist"}</button></div>
+    <div className="row"><button onClick={() => up({ watchlist: saved ? st.watchlist.filter(x => x.id !== m.id) : [m, ...st.watchlist] })}>{saved ? "Remove from watchlist" : "Add to watchlist"}</button>
+      {resume > 0 && <small>Resumes from {fmt(resume)}</small>}</div>
     {eps.length > 0 && <select value={ep} onChange={e => setEp(e.target.value)}>{eps.map(v => <option key={v.id} value={v.id}>S{v.season}E{v.episode} {v.title ?? v.name}</option>)}</select>}
-    {play && <video src={play} controls autoPlay className="player" />}
+    {busy && <p className="status">{busy}</p>}
+    {web && <video src={web} controls autoPlay className="player" />}
     <h3>Streams</h3>
     {st.addons.length === 0 && <p className="empty">Install a stream addon in Addons to see sources.</p>}
     {ranked.map((s, i) => <div key={i} className="row item">
-      <span className="tags">{s.tags.map(t => <i key={t}>{t}</i>)}</span>
+      <span className="tags">{s.tags.map(t => <i key={t}>{t}</i>)}{s.infoHash && !s.url && <i>P2P</i>}</span>
       <small>{(s.title ?? s.description ?? s.name ?? "").split("\n")[0]}</small>
-      {s.url ? <button onClick={() => { setPlay(s.url!); up({ history: [m, ...st.history.filter(x => x.id !== m.id)].slice(0, 30) }); }}>Play</button>
-        : <small>{s.infoHash ? "Torrent: needs the streaming server (phase 2)" : "External"}</small>}
+      {s.url || s.infoHash ? <button onClick={() => start(s)}>Play</button> : <small>External</small>}
     </div>)}
   </article>;
 }
