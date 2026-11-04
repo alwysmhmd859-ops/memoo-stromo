@@ -1,0 +1,44 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch mpv (player)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/resources, dl | Out-Null
+          gh release download --repo shinchiro/mpv-winbuild-cmake --pattern "mpv-x86_64-2*.7z" --dir dl
+          $a = (Get-ChildItem dl -Filter "mpv-x86_64-2*.7z" | Select-Object -First 1).FullName
+          7z x $a "-osrc-tauri/resources" mpv.exe -y
+          if (-not (Test-Path src-tauri/resources/mpv.exe)) { throw "mpv.exe not found" }
+      - name: Fetch rqbit (torrent engine)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          gh release download --repo ikatson/rqbit --pattern "*windows*" --dir dl-rq
+          $f = Get-ChildItem dl-rq | Where-Object { $_.Name -match 'x86_64|x64|amd64' -and $_.Extension -in '.exe','.zip' } | Select-Object -First 1
+          if ($f.Extension -eq '.zip') { Expand-Archive $f.FullName dl-rq/x -Force; $f = Get-ChildItem dl-rq/x -Recurse -Filter *.exe | Select-Object -First 1 }
+          Copy-Item $f.FullName src-tauri/resources/rqbit.exe
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm tauri icon logo.png
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.0' }}
+          releaseName: "Memoo Strimo ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.0' }}"
+          releaseDraft: false
