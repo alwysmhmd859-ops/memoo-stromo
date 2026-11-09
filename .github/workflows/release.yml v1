@@ -25,20 +25,37 @@ jobs:
           $a = (Get-ChildItem dl -Filter "mpv-x86_64-2*.7z" | Select-Object -First 1).FullName
           7z x $a "-osrc-tauri/resources" mpv.exe -y
           if (-not (Test-Path src-tauri/resources/mpv.exe)) { throw "mpv.exe not found" }
-      - name: Fetch rqbit (torrent engine)
-        continue-on-error: true
+      - name: Get rqbit (torrent engine)
         shell: pwsh
         run: |
-          gh release download --repo ikatson/rqbit --pattern "*windows*" --dir dl-rq
-          $f = Get-ChildItem dl-rq | Where-Object { $_.Name -match 'x86_64|x64|amd64' -and $_.Extension -in '.exe','.zip' } | Select-Object -First 1
-          if ($f.Extension -eq '.zip') { Expand-Archive $f.FullName dl-rq/x -Force; $f = Get-ChildItem dl-rq/x -Recurse -Filter *.exe | Select-Object -First 1 }
-          Copy-Item $f.FullName src-tauri/resources/rqbit.exe
+          New-Item -ItemType Directory -Force dl-rq | Out-Null
+          $ok = $false
+          try {
+            $rels = gh api "repos/ikatson/rqbit/releases?per_page=20" | ConvertFrom-Json
+            $all = $rels | ForEach-Object { $_.assets }
+            $all | ForEach-Object { Write-Host $_.name }
+            $asset = $all | Where-Object { $_.name -match '(?i)win' -and $_.name -match '(?i)x86_64|x64|amd64' -and $_.name -match '(?i)\.(exe|zip)$' -and $_.name -notmatch '(?i)desktop|setup|install' } | Select-Object -First 1
+            if ($asset) {
+              Invoke-WebRequest $asset.browser_download_url -OutFile "dl-rq/$($asset.name)"
+              $f = Get-Item "dl-rq/$($asset.name)"
+              if ($f.Extension -eq '.zip') { Expand-Archive $f.FullName dl-rq/x -Force; $f = Get-ChildItem dl-rq/x -Recurse -Filter *.exe | Select-Object -First 1 }
+              Copy-Item $f.FullName src-tauri/resources/rqbit.exe
+              $ok = $true
+            }
+          } catch { Write-Host "Download failed: $_" }
+          if (-not $ok) {
+            Write-Host "Building rqbit from source..."
+            cargo install rqbit --locked --root rq-build
+            Copy-Item rq-build/bin/rqbit.exe src-tauri/resources/rqbit.exe
+          }
+          if (-not (Test-Path src-tauri/resources/rqbit.exe)) { throw "rqbit.exe missing" }
+          exit 0
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm tauri icon logo.png
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.0' }}
-          releaseName: "Memoo Strimo ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.0' }}"
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.2' }}
+          releaseName: "Memoo Strimo ${{ github.ref_type == 'tag' && github.ref_name || 'v0.2.2' }}"
           releaseDraft: false
